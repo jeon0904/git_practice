@@ -1,0 +1,147 @@
+version: "3.7"
+
+services:
+  # spark-hive:
+  #   container_name: spark-hive2
+  #   image: registry.dtonic.io/spark-3.0.2-hadoop-3.2.2-hive-3.1.2:1.0.0
+  #   build:
+  #     context: ./spark-hive
+  #   environment:
+  #     TZ: "Asia/Seoul"
+  #     THRIFT_OPTIONS:
+  #       -v
+  #       # --conf spark.sql.extensions=io.dtonic.geohiker.spark.GeohikerSparkExtensions
+  #     JARS_TARGET_DIR: /opt/spark/jars/
+  #   volumes:
+  #     - frost-spark-warehouse-volume:/opt/spark-warehouse
+  #     - ./livy-conf/:/opt/livy/conf:ro
+  #     - ./hive-conf:/opt/hive/conf:ro
+  #     - ../data-broker/python-script:/frost/script/data-broker
+  #     - ./logs/spark:/opt/spark/logs
+  #     - ./logs/livy:/opt/livy/logs
+  #     - ./tempDir:/tempDir
+  #     - ./data:/data
+  #   ports:
+  #     - 8080-8081:8080-8081 # spark-standalone-ui
+  #     - 10000:10000 # spark-thrift
+  #     - 18080:18080 # spark-history
+  #     - 4040-4050:4040-4050 # spark-uis
+  #     - 7077:7077
+  #     - 8998:8998 # livy
+  #   depends_on:
+  #     - postgres
+
+  # postgres:
+  #   container_name: frost-postgres
+  #   build:
+  #     context: ./postgres
+  #   #restart: always
+  #   environment:
+  #     TZ: Asia/Seoul
+  #     POSTGRES_USER: postgres
+  #     POSTGRES_PASSWORD: post123
+  #     HIVE_DB_USER: hive # Meta DB USER
+  #     HIVE_DB_PASSWORD: hive123! # Meta DB USER Password
+  #     HIVE_DB_NAME: hive # Meta DB Name
+  #     FROST_UI_DB_USER: frost_ui # frost-ui DB USER
+  #     FROST_UI_DB_PASSWORD: frost_ui123! # frost-ui DB USER Password
+  #     FROST_UI_DB_NAME: frost_ui # frost-ui DB Name
+  #   volumes:
+  #     - frost-postgres-volume:/var/lib/postgresql/data
+  #   ports:
+  #     - 5491:5432
+
+  nifi:
+    build:
+      context: ./nifi
+    restart: always
+    container_name: frost-nifi
+    hostname: nifi
+    environment:
+      NIFI_WEB_HTTP_PORT: 10010
+      NIFI_JVM_HEAP_INIT: 512m
+      NIFI_JVM_HEAP_MAX: 8192m
+      TZ: Asia/Seoul
+      NIFI_SENSITIVE_PROPS_KEY: dtonic123456
+    volumes:
+      - nifi-conf:/opt/nifi/nifi-current/conf
+      - nifi-state:/opt/nifi/nifi-current/state
+      - nifi-content:/opt/nifi/nifi-current/content_repository
+      - nifi-database:/opt/nifi/nifi-current/database_repository
+      - nifi-flowfile:/opt/nifi/nifi-current/flowfile_repository
+      - nifi-provenance:/opt/nifi/nifi-current/provenance_repository
+      - ./logs/nifi:/opt/nifi/nifi-current/logs
+      - ./data/nifi-volume:/data
+    ports:
+      - 10010:10010
+
+  postgres:
+    container_name: postgres
+    image: 
+      postgres:11.4
+    restart: always
+    volumes:
+      - postgres-nifi-vol:/var/lib/postgresql/data
+    environment: 
+      - POSTGRES_DB=cattle
+      - POSTGRES_USER=nifi
+      - POSTGRES_PASSWORD=nifi123!
+      - TZ=Asia/Seoul
+    ports: 
+      - 5432:5432
+
+
+  pgadmin:
+    container_name: pgadmin
+    image: dpage/pgadmin4
+    # restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: abc@gmail.com
+      PGADMIN_DEFAULT_PASSWORD: jenna
+      PGADMIN_LISTEN_PORT: 80
+    volumes:
+      - pgadmin-volume:/var/lib/pgadmin
+    ports:
+      - 80:80
+
+  mysql:
+    container_name: mysql_nifi
+    image: mysql
+    restart: always
+    hostname: mysql
+    environment:
+      TZ: Asia/Seoul
+      MYSQL_USER: nifi
+      MYSQL_PASSWORD: nifi123!
+      MYSQL_ROOT_PASSWORD: nifi123!
+    command:
+      #- --character-set-server=utf8mb4
+      #- --collation-server=utf8mb4_unicode_ci
+      - --character-set-server=utf8 
+      - --collation-server=utf8_general_ci
+
+    volumes:
+      - mysql-data-volume:/var/lib/mysql
+      - mysql-config:/etc/mysql/conf.d
+    ports: 
+      - 3306:3306
+
+  
+volumes:
+  frost-postgres-volume:
+  frost-spark-warehouse-volume:
+  nifi-conf:
+  nifi-state:
+  nifi-content:
+  nifi-database:
+  nifi-flowfile:
+  nifi-provenance:
+  postgres-nifi-vol:
+  mysql-data-volume:
+  mysql-config:
+  pgadmin-volume:
+  
+networks:
+  default:
+    external:
+      name: docker_nifi_nifi-workflow-bridge

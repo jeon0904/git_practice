@@ -1,0 +1,89 @@
+version: "3.7"
+
+services:
+  spark-hive:
+    container_name: spark-hive2
+    image: registry.dtonic.io/spark-3.0.2-hadoop-3.2.2-hive-3.1.2:1.0.0
+    build:
+      context: ./spark-hive
+    environment:
+      TZ: "Asia/Seoul"
+      THRIFT_OPTIONS:
+        -v
+        # --conf spark.sql.extensions=io.dtonic.geohiker.spark.GeohikerSparkExtensions
+      JARS_TARGET_DIR: /opt/spark/jars/
+    volumes:
+      - frost-spark-warehouse-volume:/opt/spark-warehouse
+      - ./livy-conf/:/opt/livy/conf:ro
+      - ./hive-conf:/opt/hive/conf:ro
+      - ./logs/spark:/opt/spark/logs
+      - ./logs/livy:/opt/livy/logs
+      - /home/techlab/frost/script:/frost/script/data-broker
+      - /home/techlab/frost/storage:/tempDir
+      - ./data:/data
+    ports:
+      - 8080-8081:8080-8081 # spark-standalone-ui
+      - 10000:10000 # spark-thrift
+      - 18080:18080 # spark-history
+      # - 4040-4050:4040-4050 # spark-uis
+      - 7077:7077
+      - 8998:8998 # livy
+    depends_on:
+      - postgres
+
+  postgres:
+    container_name: frost-postgres
+    build:
+      context: ./postgres
+    restart: always
+    environment:
+      TZ: Asia/Seoul
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: post123
+      HIVE_DB_USER: hive # Meta DB USER
+      HIVE_DB_PASSWORD: hive123! # Meta DB USER Password
+      HIVE_DB_NAME: hive # Meta DB Name
+      FROST_UI_DB_USER: frost_ui # frost-ui DB USER
+      FROST_UI_DB_PASSWORD: frost_ui123! # frost-ui DB USER Password
+      FROST_UI_DB_NAME: frost_ui # frost-ui DB Name
+    volumes:
+      - frost-postgres-volume:/var/lib/postgresql/data
+    ports:
+      - 5491:5432
+
+  nifi:
+    build:
+      context: ./nifi
+    restart: always
+    container_name: frost-nifi
+    hostname: nifi
+    environment:
+      NIFI_WEB_HTTP_PORT: 10010
+      TZ: Asia/Seoul
+      NIFI_SENSITIVE_PROPS_KEY: dtonic123456
+    volumes:
+      - nifi-conf:/opt/nifi/nifi-current/conf
+      - nifi-state:/opt/nifi/nifi-current/state
+      - nifi-content:/opt/nifi/nifi-current/content_repository
+      - nifi-database:/opt/nifi/nifi-current/database_repository
+      - nifi-flowfile:/opt/nifi/nifi-current/flowfile_repository
+      - nifi-provenance:/opt/nifi/nifi-current/provenance_repository
+      - ./logs/nifi:/opt/nifi/nifi-current/logs
+      - ./nifi-vol:/data
+    ports:
+      - 10010:10010
+
+volumes:
+  frost-postgres-volume:
+  frost-spark-warehouse-volume:
+  nifi-conf:
+  nifi-state:
+  nifi-content:
+  nifi-database:
+  nifi-flowfile:
+  nifi-provenance:
+
+networks:
+  default:
+    external:
+      name: frost-bridge

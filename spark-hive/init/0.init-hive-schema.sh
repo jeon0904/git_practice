@@ -1,0 +1,1 @@
+/opt/hive/bin/schematool -initSchema -dbType postgres
